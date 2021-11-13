@@ -27,6 +27,9 @@ y_low = lower[1::2]
 h_up = interp1d(x_up, y_up)
 h_low = interp1d(x_low, y_low)
 
+def airfoil_surface(x):
+    """Returns upper and lower coordinate of airfoil surface for a chordwise posistion"""
+    return h_up(x), h_low(x)
 
 def thickness(x):
     y1 = h_up(x)
