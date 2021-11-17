@@ -46,8 +46,6 @@ Cd_10 = interp1d(pd_10["y_10"], pd_10["Cd_10"], kind = 'cubic', fill_value='extr
 Cm_10 = interp1d(pd_10["y_10"], pd_10["Cm_10"], kind = 'cubic', fill_value='extrapolate')
 
 # %%
-plt.plot(pd_0["y_0"], pd_0["Cl_0"])
-# %%
 def wing_C(distribution):
     """Returns wing coefficient given a distribution"""
     sectional = lambda y: distribution(y) * chord(y)
