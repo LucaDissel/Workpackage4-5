@@ -1,6 +1,7 @@
 #%%
 from numpy.lib.npyio import load
 import scipy as sp
+from scipy.integrate.quadpack import quad
 from scipy.interpolate import interp1d
 import numpy as np
 from matplotlib import pyplot as plt
@@ -15,6 +16,7 @@ from copy import deepcopy
 def dynamic_p(rho, V):
     return rho * V**2 / 2
 
+rho_FL330 = 0.418501741
 q = dynamic_p(0.418501741, 224.2977776)
 b2 = 16.07/2
 S = 28.7
@@ -51,8 +53,12 @@ def wing_C(distribution):
     sectional = lambda y: distribution(y) * chord(y)
     integral, errorest = integrate.quad(sectional, 0, b2)
     return 2 * integral / S
+
+#%%
+
 #%%
 CL_0, CL_10 = wing_C(Cl_0), wing_C(Cl_10)
+ 
 # %%
 def Cl_distribution(CL):
     """Returns the lift distribution and aoa to achieve a given CL"""
@@ -86,7 +92,7 @@ def V_distribution(CL, q, W_disribution=None, point_loads=None):
     if W_disribution is None:
         W_disribution = lambda y:0
 
-    F_distribution = lambda y: Cn_distribution(CL)(y) * chord(y) * q + W_disribution(y)
+    F_distribution = lambda y: Cl_distribution(CL)[0](y) * chord(y) * q - W_disribution(y)
 
     def P(y):
         P_tot = 0
@@ -111,10 +117,5 @@ def T_distribution(CL, q):
     T = lambda y: integrate.quad(dTdx, y, b2)[0]
     T_fast = interp1d(y, [T(i) for i in y], kind='cubic', fill_value='extrapolate')
     return T_fast
-# %%
-V = V_distribution(0.2, q)
-#%%
-M = M_distribution(V)
 
-#%%
-T = T_distribution(0.2, q)
+
