@@ -1,16 +1,12 @@
 #%%
 from numpy.lib.npyio import load
-import scipy as sp
 from scipy.integrate.quadpack import quad
 from scipy.interpolate import interp1d
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 from scipy import integrate
-from scipy.integrate import odeint
-import scipy.special as special
-from numba import jit, generated_jit
-from copy import deepcopy
+from functools import lru_cache
 
 #%%
 def dynamic_p(rho, V):
@@ -23,6 +19,21 @@ S = 28.7
 root_c = 2.46 
 tip_c = 1.11
 y = np.arange(0, b2, 0.01)
+
+#%%
+def interp_for_range(range_object):
+    def wrapper(func):
+        @lru_cache(maxsize=None)
+        def make_interp1d(*args, **kwargs):     
+            return interp1d(range_object, func(range_object, *args, **kwargs), kind='cubic', fill_value='extrapolate')
+            
+        def return_func(y, *args, **kwargs):
+            interpreted_func = make_interp1d(*args, **kwargs)
+            return interpreted_func(y)
+
+        return return_func
+
+    return wrapper       
 
 def chord(y):
     """Returns chord length at spanwise posistion"""
@@ -86,11 +97,15 @@ def heaviside(c):
     return lambda x: c <= x
 
 
-def V_distribution(CL, q, W_disribution=None, point_loads=None):
+def F_distribution(CL, q, W_disribution=None):
     if W_disribution is None:
         W_disribution = lambda y:0
+    lambda_F =  lambda y: Cl_distribution(CL)[0](y) * chord(y) * q - W_disribution(y)
+    return  interp1d(y, lambda_F(y), kind='cubic', fill_value='extrapolate')
 
-    F_distribution = lambda y: Cl_distribution(CL)[0](y) * chord(y) * q - W_disribution(y)
+
+def V_distribution(CL, q, W_disribution=None, point_loads=None):
+    F = F_distribution(CL, q, W_disribution)
 
     def P(y):
         P_tot = 0
@@ -99,21 +114,28 @@ def V_distribution(CL, q, W_disribution=None, point_loads=None):
                 P_tot += force * (1-heaviside(location)(y))
         return P_tot
 
-    V = lambda y: integrate.quad(F_distribution, y, b2)[0] + P(y)
-    V_fast = interp1d(y, [V(i) for i in y], kind='cubic', fill_value='extrapolate')
-    return V_fast
+    quad_vec = np.vectorize(quad)
+    V = lambda y: quad_vec(F, y, b2)[0] + P(y)
+
+    return interp1d(y, V(y), kind='cubic', fill_value='extrapolate')
+
     
 # %%
 def M_distribution(V_distribution):
-    M = lambda y: -integrate.quad(V_distribution, y, b2)[0]
-    M_fast = interp1d(y, [M(i) for i in y], kind='cubic', fill_value='extrapolate')
-    return M_fast
+    quad_vec = np.vectorize(quad)
+    M = lambda y: -quad_vec(V_distribution, y, b2)[0]
+    return interp1d(y, M(y), kind='cubic', fill_value='extrapolate')
 
 #%%
 def T_distribution(CL, q):
     dTdx = lambda y: Cm_distribution(CL)(y) * q * chord(y)
-    T = lambda y: integrate.quad(dTdx, y, b2)[0]
-    T_fast = interp1d(y, [T(i) for i in y], kind='cubic', fill_value='extrapolate')
+    dTdx = interp1d(y, dTdx(y), kind='cubic', fill_value='extrapolate')
+    
+    quad_vec = np.vectorize(quad)
+    T = lambda y: quad_vec(dTdx, y, b2)[0]
+    T_fast = interp1d(y, T(y), kind='cubic', fill_value='extrapolate')
     return T_fast
 
 
+
+# %%
