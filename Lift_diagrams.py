@@ -77,9 +77,9 @@ def Cl_distribution(CL):
     return Cl, aoa
 
 # %%
-def Cd_disribution(CL):
-    Cd = lambda y: Cd_0(y) + (CL-CL_0)/(CL_10-CL_0)*(Cd_10(y)-Cd_0(y))
-    return Cd
+# def Cd_disribution(CL):
+#     Cd = lambda y: Cd_0(y) + (CL-CL_0)/(CL_10-CL_0)*(Cd_10(y)-Cd_0(y))
+#     return Cd
 
 # %%
 def Cm_distribution(CL):
@@ -87,10 +87,10 @@ def Cm_distribution(CL):
     return Cm
 
 # %%
-def Cn_distribution(CL):
-    Cl, aoa = Cl_distribution(CL)
-    Cd = Cd_disribution(CL)
-    return lambda y: np.cos(aoa)*Cl(y) + np.sin(aoa)*Cd(y)
+# def Cn_distribution(CL):
+#     Cl, aoa = Cl_distribution(CL)
+#     Cd = Cd_disribution(CL)
+#     return lambda y: np.cos(aoa)*Cl(y) + np.sin(aoa)*Cd(y)
 
 # %%
 def heaviside(c):
