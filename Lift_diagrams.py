@@ -90,7 +90,7 @@ def Ai_distribution(CL):
     return Ai
 
 def Cd_distribution(CL):
-  Cd = lambda y: Cl_distribution(CL)[0](y) * -Ai_distribution(CL)(y)  #NOT DONE.. W.I.P. xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  Cd = lambda y: Cl_distribution(CL)[0](y) * -Ai_distribution(CL)(y)
   return Cd
 
 
