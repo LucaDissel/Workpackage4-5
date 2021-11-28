@@ -125,7 +125,7 @@ def M_distribution(V_distribution):
 def T_distribution(CL, q, wingbox):
     F = F_distribution(CL, q)
     Cm = Cm_distribution(CL)
-    dTdx = Cm(y) * q * chord(y) - (wingbox.x_centroid(y) - chord(y)/4) * F(y)
+    dTdx = Cm(y) * q * chord(y)**2 - (wingbox.x_centroid(y) - chord(y)/4) * F(y)
     dTdx = interp1d(y, dTdx, kind='cubic', fill_value='extrapolate')
     
     quad_vec = np.vectorize(quad)
