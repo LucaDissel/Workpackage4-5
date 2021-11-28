@@ -5,8 +5,6 @@ from scipy.interpolate import interp1d
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
-from scipy import integrate
-from functools import lru_cache
 
 #%%
 def dynamic_p(rho, V):
@@ -22,20 +20,6 @@ rho_FL330 = 0.418501741
 q_crit = dynamic_p(rho_FL330, 250.18)
 y = np.arange(0, b2, 0.01)
 
-#%%
-def interp_for_range(range_object):
-    def wrapper(func):
-        @lru_cache(maxsize=None)
-        def make_interp1d(*args, **kwargs):
-            return interp1d(range_object, func(range_object, *args, **kwargs), kind='cubic', fill_value='extrapolate')
-
-        def return_func(y, *args, **kwargs):
-            interpreted_func = make_interp1d(*args, **kwargs)
-            return interpreted_func(y)
-
-        return return_func
-
-    return wrapper
 
 def chord(y):
     """Returns chord length at spanwise posistion"""
@@ -64,10 +48,8 @@ Cm_10 = interp1d(pd_10["y_10"], pd_10["Cm_10"], kind = 'cubic', fill_value='extr
 def wing_C(distribution):
     """Returns wing coefficient given a distribution"""
     sectional = lambda y: distribution(y) * chord(y)
-    integral, errorest = integrate.quad(sectional, 0, b2)
+    integral, errorest = quad(sectional, 0, b2)
     return 2 * integral / S
-
-#%%
 
 #%%
 CL_0, CL_10 = wing_C(Cl_0), wing_C(Cl_10)
@@ -107,13 +89,10 @@ def Cn_distribution(CL):
     Cd = Cd_distribution(CL)
     return lambda y: np.cos(aoa)*Cl(y) + np.sin(aoa)*Cd(y)
 
-
-
 # %%
 def heaviside(c):
     return lambda x: c <= x
 
-def F_distribution(CL, q, W_distribution=None):
 
 def F_distribution(CL, q, W_disribution=None):
     if W_disribution is None:
@@ -135,7 +114,6 @@ def V_distribution(CL, q, W_disribution=None, point_loads=None):
     quad_vec = np.vectorize(quad)
     V = quad_vec(F, y, b2)[0] + P(y)
     return interp1d(y, V, kind='cubic', fill_value='extrapolate')
-
 
 # %%
 def M_distribution(V_distribution):
