@@ -18,6 +18,8 @@ b2 = 16.07/2
 S = 28.7
 root_c = 2.46 
 tip_c = 1.11
+rho_FL330 = 0.418501741
+q_crit = dynamic_p(rho_FL330, 250.18)
 y = np.arange(0, b2, 0.01)
 
 #%%
@@ -100,8 +102,8 @@ def heaviside(c):
 def F_distribution(CL, q, W_disribution=None):
     if W_disribution is None:
         W_disribution = lambda y:0
-    lambda_F =  lambda y: Cl_distribution(CL)[0](y) * chord(y) * q - W_disribution(y)
-    return  interp1d(y, lambda_F(y), kind='cubic', fill_value='extrapolate')
+    F = Cl_distribution(CL)[0](y) * chord(y) * q - W_disribution(y)
+    return  interp1d(y, F, kind='cubic', fill_value='extrapolate')
 
 
 def V_distribution(CL, q, W_disribution=None, point_loads=None):
@@ -115,26 +117,27 @@ def V_distribution(CL, q, W_disribution=None, point_loads=None):
         return P_tot
 
     quad_vec = np.vectorize(quad)
-    V = lambda y: quad_vec(F, y, b2)[0] + P(y)
-
-    return interp1d(y, V(y), kind='cubic', fill_value='extrapolate')
+    V = quad_vec(F, y, b2)[0] + P(y)
+    return interp1d(y, V, kind='cubic', fill_value='extrapolate')
 
     
 # %%
 def M_distribution(V_distribution):
     quad_vec = np.vectorize(quad)
-    M = lambda y: -quad_vec(V_distribution, y, b2)[0]
-    return interp1d(y, M(y), kind='cubic', fill_value='extrapolate')
+    M = -quad_vec(V_distribution, y, b2)[0]
+    return interp1d(y, M, kind='cubic', fill_value='extrapolate')
 
 #%%
-def T_distribution(CL, q):
-    dTdx = lambda y: Cm_distribution(CL)(y) * q * chord(y)
-    dTdx = interp1d(y, dTdx(y), kind='cubic', fill_value='extrapolate')
+def T_distribution(CL, q, wingbox):
+    F = F_distribution(CL, q)
+    Cm = Cm_distribution(CL)
+    dTdx = Cm(y) * q * chord(y) - (wingbox.x_centroid(y) - chord(y)/4) * F(y)
+    dTdx = interp1d(y, dTdx, kind='cubic', fill_value='extrapolate')
     
     quad_vec = np.vectorize(quad)
-    T = lambda y: quad_vec(dTdx, y, b2)[0]
-    T_fast = interp1d(y, T(y), kind='cubic', fill_value='extrapolate')
-    return T_fast
+    T = quad_vec(dTdx, y, b2)[0]
+    return interp1d(y, T, kind='cubic', fill_value='extrapolate')
+
 
 
 
