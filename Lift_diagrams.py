@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
+from functools import lru_cache
 
 #%%
 def dynamic_p(rho, V):
@@ -122,6 +123,7 @@ def M_distribution(V_distribution):
     return interp1d(y, M, kind='cubic', fill_value='extrapolate')
 
 #%%
+@lru_cache(maxsize=None)
 def T_distribution(CL, q, wingbox):
     F = F_distribution(CL, q)
     Cm = Cm_distribution(CL)
