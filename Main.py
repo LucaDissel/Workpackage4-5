@@ -29,7 +29,7 @@ rho_FL330 = 0.418501741
 q_crit = dynamic_p(rho_FL330, 250.18)
 CL_crit = 0.514 * 1.5
 
-V = V_distribution(-CL_crit, q_crit)
+V = V_distribution(CL_crit, q_crit)
 M = M_distribution(V)
 # In[ ]:
 def interp_on_domain(range_object):
@@ -51,8 +51,28 @@ def interp_on_domain(range_object):
 
 
 # In[ ]:
+
+
+class t:
+    def __init__(self, start_thickness, end_thicnkess=None, length=b2) -> None:
+        if start_thickness < 0 or end_thicnkess < 0:
+            raise ValueError('Cannot have negative thicknesses')
+        self.t1 = start_thickness * 1e-3
+        if end_thicnkess is not None:
+            self.t2 = end_thicnkess * 1e-3
+        else:
+            self.t2 = end_thicnkess
+        self.length = length
+
+    def __call__(self, y):
+        """Return thickness in m at y"""
+        return self.t1 - (self.t1 -
+                          self.t2) / self.length * y * (self.length >= y)
+
+
+# In[ ]:
 class Panel:
-    def __init__(self, point1, point2, thickness, span=b2):
+    def __init__(self, point1, point2, thickness: t, span=b2):
         """point1 and point2 are coordinates relative to the chord, thickness in mm"""
         # make sure point2 has the highest z coordinate
         if point1[1] > point2[1]:  
@@ -166,41 +186,10 @@ class L_stringer(Stringer):
 # In[ ]:
 
 
-class t:
-    def __init__(self, start_thickness, end_thicnkess=None, length=b2) -> None:
-        if start_thickness < 0 or end_thicnkess < 0:
-            raise ValueError('Cannot have negative thicknesses')
-        self.t1 = start_thickness * 1e-3
-        if end_thicnkess is not None:
-            self.t2 = end_thicnkess * 1e-3
-        else:
-            self.t2 = end_thicnkess
-        self.length = length
-
-    def __eq__(self, other):
-        if type(self) is not type(other):
-            return False
-        else:
-            return self.t1 == other.t1 and self.t2 == other.t2 and self.length == other.length
-
-    def __repr__(self) -> str:
-        if self.t2 is None:
-            return f'Constant thickness of {self.t1 * 1e3} mm over a length of {self.length} m.'
-        else:
-            return (
-                f'Linear varying thickness of {self.t1 * 1e3} mm to {self.t2 * 1e3} mm'
-                + f' over a length of {self.length} m.')
-
-    def __call__(self, y):
-        return self.t1 - (self.t1 -
-                          self.t2) / self.length * y * (self.length >= y)
-
-
-# In[ ]:
-
-
 class WingBox:
     Kc_lim = 4
+    Ks_lim = 5.2
+    Kv = 1.5 * 1.5
 
     def __init__(self,
                  front_spar_x,
@@ -419,12 +408,19 @@ class WingBox:
             if system.ndim > 2:
                 system = np.moveaxis(system, 2, 0)
                 N, M, M = np.shape(system)
-                righthandside = np.broadcast_to(np.array([0, 0, T]), (N, M))
+                if np.shape(T) == (N,):
+                    T = np.reshape(T, (N, 1))
+                    zeros = np.zeros((N, 2))
+                    righthandside = np.hstack((zeros, T))
+                elif np.shape(T) in ((), (1,)): 
+                    righthandside = np.broadcast_to(np.array([0, 0, T]), (N, M))
+                else:
+                    raise ValueError('T must either have dimension 1 or have the same dimension as y')
                 q1, q2, dthetadx = np.swapaxes(LA.solve(system, righthandside),
                                                0, 1)
             else:
                 q1, q2, dthetadx = LA.solve(system, np.array([0, 0, T]))
-                span_m = self.panels['middle_spar'].span
+            span_m = self.panels['middle_spar'].span
 
         if self.single_cell or (span_m != b2):
             x1, x2 = self.points["front_upper"][0], self.points["rear_upper"][
@@ -436,13 +432,13 @@ class WingBox:
                 integral += panel.l(y) / panel.t(y)
             dthetadx_single_cell = T / G * integral
 
-        if not self.single_cell:
-            q1 = np.where(y <= span_m, q1, q)
-            q2 = np.where(y <= span_m, q2, q)
-            dthetadx = np.where(y <= span_m, dthetadx, dthetadx_single_cell)
-            return q1, q2, dthetadx
-        else:
-            return q, q, dthetadx_single_cell
+            if not self.single_cell:
+                q1 = np.where(y <= span_m, q1, q)
+                q2 = np.where(y <= span_m, q2, q)
+                dthetadx = np.where(y <= span_m, dthetadx, dthetadx_single_cell)
+            else:
+                return q, q, dthetadx_single_cell
+        return q1, q2, dthetadx
 
     def J_single_cell(self, y):
         # Calculate area inside box
@@ -474,8 +470,17 @@ class WingBox:
         z_c = self.z_centroid(y)
         return M(y) * (z - z_c) / self.I_xx(y)
 
-    def tau(self, y, CL=CL_crit, q=q_crit):
-        self.T = T_distribution(CL, q, self)
+    def tau_max(self, y, CL=CL_crit, q=q_crit):
+        T = T_distribution(CL, q, self)(y)
+
+        spar_area = self.panels['front_spar'].A(y) + self.panels['read_spar'].A(y)
+        if self.single_cell:
+            spar_area += self.panels['middle_spar'].A(y)
+        tau_avg = V(y) / spar_area
+        tau_max = tau_avg * self.Kv 
+        q1, q2, _ = self.solve_shearflow(y, T)
+        front_tau_max = q1 / self.panels['front_spar'].t(y) 
+
 
     #################################################################################
     # Analysis
@@ -596,18 +601,16 @@ def z(y, wingbox: WingBox):
 
 
 @interp_on_domain(y)
-def dthetadx(y, wingbox: WingBox):
+def dthetadx(y, wingbox: WingBox, CL=CL_crit, q=q_crit):
     """calculate first derivative of the rotation"""
-    T = T_distribution(CL_crit, q_crit, wingbox)
+    T = T_distribution(CL, q, wingbox)
     return T(y) / wingbox.J(y) / G
 
 
-def theta(y, wingbox: WingBox):
+def theta(y, wingbox: WingBox, CL=CL_crit, q=q_crit):
     """calculate rotation through integration"""
-    y_range = np.linspace(0, b2, 800)
-    func = interp1d(y_range,
-                    dthetadx(y, wingbox),
-                    kind='cubic',
-                    fill_value='extrapolate')
-    return [quad(func, 0, i)[0] * 180 / np.pi for i in y]
+    # quad_vec = np.vectorize(quad)
+    return [quad(dthetadx, 0, i, args=(wingbox, CL, q))[0] * 180 / np.pi for i in y]
 
+
+# %%
