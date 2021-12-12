@@ -129,7 +129,7 @@ class Stringer:
     def __init__(self, area, x, length, upper: bool = True):
         """area is in square mm, point is the coordinate realtive to the chord and length is the spanwise length of the stringer"""
         self.upper = upper
-        self.A = area * 1e-6
+        self.area = area * 1e-6
         self.point = np.array([x, 0])
         self.length = length
 
@@ -144,6 +144,9 @@ class Stringer:
     @z.setter
     def z(self, new_z):
         self.point[1] = new_z
+    
+    def A(self, y):
+        return self.area * (self.length >= y)
 
     def Q_x(self, y):
         """Returns first moment of area about z=0"""
@@ -310,7 +313,7 @@ class WingBox:
 
         if self.stringers is not None:
             for stringer in self.stringers:
-                A += stringer.A
+                A += stringer.A(y)
         return A
 
     def enclosed_A(self, y, x1, x2):
@@ -381,8 +384,9 @@ class WingBox:
             # q1 is shear flow in left box, q2 shear flow in the right box
             points = self.points
             panels = self.panels
-            x1, x2, x3 = points["front_upper"][0], points["middle_upper"][
-                0], points["rear_upper"][0]
+            x1 = points["front_upper"][0]
+            x2 = points["middle_upper"][0]
+            x3 = points["rear_upper"][0]
             A_1 = self.enclosed_A(y, x1, x2)
             A_2 = self.enclosed_A(y, x2, x3)
             a = 0
@@ -423,8 +427,8 @@ class WingBox:
             span_m = self.panels['middle_spar'].span
 
         if self.single_cell or (span_m != b2):
-            x1, x2 = self.points["front_upper"][0], self.points["rear_upper"][
-                0]
+            x1 = self.points["front_upper"][0]
+            x2 = self.points["rear_upper"][0]
             if self.single_cell:
                 A = self.enclosed_A(y, x1, x2)
             else:
@@ -433,7 +437,7 @@ class WingBox:
             integral = 0
             for panel in self.panels.values():
                 integral += panel.l(y) / panel.t(y)
-            dthetadx_single_cell = T / G * integral
+            dthetadx_single_cell = q / (2 * A * G) * integral
 
             if not self.single_cell:
                 q1 = np.where(y <= span_m, q1, q)
@@ -441,6 +445,7 @@ class WingBox:
                 dthetadx = np.where(y <= span_m, dthetadx, dthetadx_single_cell)
             else:
                 return q, q, dthetadx_single_cell
+
         return q1, q2, dthetadx
 
     def J_single_cell(self, y):
@@ -449,7 +454,7 @@ class WingBox:
         A = self.enclosed_A(y, x1, x2)
         integral = 0
         for panel in self.panels.values():
-            integral += panel.h * chord(y) / panel.t(y)
+            integral += panel.l(y) / panel.t(y)
         return 4 * A**2 / integral
 
     def J_multi_cell(self, y):
@@ -502,9 +507,9 @@ class WingBox:
 
         # loop over sections between ribs
         rib1 = self.ribs[0]
-        T_or_F = True  # for positive loadfactor
+        loadfactor_is_positive = True  # for positive loadfactor
         if M(0.1) > 0:
-            T_or_F = False  # for negative loadfactor
+            loadfactor_is_positive = False  # for negative loadfactor
 
         for rib2 in self.ribs[1:]:
             y1, y2 = rib1, rib2
@@ -517,8 +522,7 @@ class WingBox:
                 section_points.append(self.panels['middle_spar'].p2)
             if self.stringers is not None:
                 for stringer in self.stringers:
-                    if stringer.upper is T_or_F:
-                        if stringer.length >= y2:
+                    if (stringer.upper is loadfactor_is_positive) and (stringer.length >= y2):
                             section_points.append(stringer.point)
             section_points.sort(key=lambda elem: elem[0])
 
@@ -529,13 +533,12 @@ class WingBox:
                 b = LA.norm(point2 - point1) * chord2
                 x = (point1[0] + point2[0]) / 2
                 t2 = self.find_panel(x, True).t(y2)
-                sigma_crit = np.pi**2 * self.Kc_lim * E / (12 *
-                                                           (1 - v**2)) * (t2 /
-                                                                          b)**2
+                sigma_crit = np.pi**2 * self.Kc_lim * E / (
+                    12 *(1 - v**2)) * (t2 / b)**2
 
-                if T_or_F:  # for positive loadfactor
+                if loadfactor_is_positive:  # for positive loadfactor
                     z_max_or_min = min(point1[1], point2[1])
-                elif not T_or_F:  # for negative loadfactor
+                else:  # for negative loadfactor
                     z_max_or_min = max(point1[1], point2[1])
                 sigma1_max = self.sigma(y1, z_max_or_min)
                 sigma2_max = self.sigma(y2, z_max_or_min)
@@ -614,6 +617,3 @@ def theta(y, wingbox: WingBox, CL=CL_crit, q=q_crit):
     """calculate rotation through integration"""
     # quad_vec = np.vectorize(quad)
     return [quad(dthetadx, 0, i, args=(wingbox, CL, q))[0] * 180 / np.pi for i in y]
-
-
-# %%
