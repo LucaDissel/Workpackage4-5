@@ -317,7 +317,7 @@ class WingBox:
         assert x2 > x1
         z1 = airfoil_surface(x1)
         z2 = airfoil_surface(x2)
-        return (x2 - x1) / 2 * (z1[1] - z1[0] + z2[1] - z2[0]) * chord(y)**2
+        return (x2 - x1) / 2 * (z1[0] - z1[1] + z2[0] - z2[1]) * chord(y)**2
 
     def z_centroid(self, y):
         """Returns the z-coordinate of the centroid at a given location of span"""
@@ -425,7 +425,10 @@ class WingBox:
         if self.single_cell or (span_m != b2):
             x1, x2 = self.points["front_upper"][0], self.points["rear_upper"][
                 0]
-            A = self.enclosed_A(y, x1, x2)
+            if self.single_cell:
+                A = self.enclosed_A(y, x1, x2)
+            else:
+                A = A_1 +  A_2
             q = T / (2 * A)
             integral = 0
             for panel in self.panels.values():
