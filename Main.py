@@ -546,10 +546,11 @@ class WingBox:
                 print(f"Sigma crit = {sigma_crit:2.2}")
                 print(f"Sigma 1 max = {sigma1_max:2.2}")
                 print(f"Sigma 2 max = {sigma2_max:2.2}")
-
                 point1 = point2
-
             rib1 = rib2
+    
+    def check_shear_buckling(self):
+        pass
 
     def plot(self):
         c = chord(0)
@@ -587,10 +588,10 @@ class WingBox:
         if T is None:
             T = T_distribution(CL, q, self)
         front_tau_max, middle_tau_max, rear_tau_max = self.tau_max(y, T, V)
-        plt.plot(y, front_tau_max, label='$\tau$ front spar')
+        plt.plot(y, front_tau_max, label='$\\tau$ front spar')
         if not self.single_cell:
-            plt.plot(y, middle_tau_max, label='$\tau$ middle spar')
-        plt.plot(y, rear_tau_max, label='$\tau$ rear spar')
+            plt.plot(y, middle_tau_max, label='$\\tau$ middle spar')
+        plt.plot(y, rear_tau_max, label='$\\tau$ rear spar')
         plt.legend()
 
 
