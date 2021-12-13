@@ -629,3 +629,6 @@ def theta(y, wingbox: WingBox, CL=CL_crit, q=q_crit):
     """calculate rotation through integration"""
     # quad_vec = np.vectorize(quad)
     return [quad(dthetadx, 0, i, args=(wingbox, CL, q))[0] * 180 / np.pi for i in y]
+
+
+# Luca typed this
