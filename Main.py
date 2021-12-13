@@ -12,7 +12,7 @@ from typing import Any, Iterable, Optional
 
 # In[ ]:
 from NACA_63210 import airfoil_surface
-from Lift_diagrams import chord, V_distribution, M_distribution, T_distribution, dynamic_p
+from Lift_diagrams import chord, V_distribution, M_distribution, T_distribution, dynamic_p, q_crit, CL_crit, V, M, y
 
 # In[ ]:
 b2 = 16.07 / 2
@@ -24,13 +24,7 @@ v = 0.33
 UTS = 290 * 10**6
 YieldStregth = 240 * 10**6
 rho_al = 2700
-y = np.linspace(0, b2, 800)
-rho_FL330 = 0.418501741
-q_crit = dynamic_p(rho_FL330, 250.18)
-CL_crit = 0.514 * 1.5
 
-V = V_distribution(CL_crit, q_crit)
-M = M_distribution(V)
 # In[ ]:
 def interp_on_domain(range_object):
     def wrapper(func):
@@ -413,9 +407,9 @@ class WingBox:
                 system = np.moveaxis(system, 2, 0)
                 N, M, M = np.shape(system)
                 if np.shape(T) == (N,):
-                    T = np.reshape(T, (N, 1))
+                    T_column = np.reshape(T, (N, 1))
                     zeros = np.zeros((N, 2))
-                    righthandside = np.hstack((zeros, T))
+                    righthandside = np.hstack((zeros, T_column))
                 elif np.shape(T) in ((), (1,)): 
                     righthandside = np.broadcast_to(np.array([0, 0, T]), (N, M))
                 else:
@@ -432,7 +426,7 @@ class WingBox:
             if self.single_cell:
                 A = self.enclosed_A(y, x1, x2)
             else:
-                A = A_1 +  A_2
+                A = A_1 + A_2
             q = T / (2 * A)
             integral = 0
             for panel in self.panels.values():
@@ -478,17 +472,21 @@ class WingBox:
         z_c = self.z_centroid(y)
         return M(y) * (z - z_c) / self.I_xx(y)
 
-    def tau_max(self, y, CL=CL_crit, q=q_crit):
-        T = T_distribution(CL, q, self)(y)
+    def tau_max(self, y, T, V=V):
 
-        spar_area = self.panels['front_spar'].A(y) + self.panels['read_spar'].A(y)
+        spar_area = self.panels['front_spar'].A(y) + self.panels['rear_spar'].A(y)
         if self.single_cell:
             spar_area += self.panels['middle_spar'].A(y)
         tau_avg = V(y) / spar_area
         tau_max = tau_avg * self.Kv 
-        q1, q2, _ = self.solve_shearflow(y, T)
-        front_tau_max = q1 / self.panels['front_spar'].t(y) 
-
+        q1, q2, _ = self.solve_shearflow(y, T(y))
+        front_tau_max = -q1 / self.panels['front_spar'].t(y) + tau_max
+        rear_tau_max = q2 / self.panels['rear_spar'].t(y) + tau_max
+        middle_tau_max = None
+        if not self.single_cell:
+            middle_tau_max = (q1 - q2) / self.panels['middle_spar'].t(y) + tau_max
+        return front_tau_max, middle_tau_max, rear_tau_max
+        
 
     #################################################################################
     # Analysis
@@ -571,7 +569,7 @@ class WingBox:
             plt.gcf().set_size_inches(15, 15)
             plt.gcf().set_dpi(200)
 
-    def plot_max_stress(self):
+    def plot_max_stress(self, M=M):
         c = chord(0)
         x = np.linspace(0, 1, 100)
         panels = [self.panels['front_spar'], self.panels['rear_spar']]
@@ -579,10 +577,20 @@ class WingBox:
             panels.append(self.panels['middle_spar'])
         z_max = max([panel.p2[1] for panel in panels])
         z_min = min([panel.p1[1] for panel in panels])
-        stress_lower = self.sigma(y, z_min)
-        stress_upper = self.sigma(y, z_max)
+        stress_lower = self.sigma(y, z_min, M=M)
+        stress_upper = self.sigma(y, z_max, M=M)
         plt.plot(y, stress_lower, label='$\sigma$ lower panel')
         plt.plot(y, stress_upper, label='$\sigma$ upper panel')
+        plt.legend()
+
+    def plot_max_shear(self, CL=CL_crit, q=q_crit, T=None, V=V):
+        if T is None:
+            T = T_distribution(CL, q, self)
+        front_tau_max, middle_tau_max, rear_tau_max = self.tau_max(y, T, V)
+        plt.plot(y, front_tau_max, label='$\tau$ front spar')
+        if not self.single_cell:
+            plt.plot(y, middle_tau_max, label='$\tau$ middle spar')
+        plt.plot(y, rear_tau_max, label='$\tau$ rear spar')
         plt.legend()
 
 

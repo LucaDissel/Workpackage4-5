@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 from functools import lru_cache
 
+
 #%%
 def dynamic_p(rho, V):
     return rho * V**2 / 2
@@ -19,7 +20,8 @@ root_c = 2.46
 tip_c = 1.11
 rho_FL330 = 0.418501741
 q_crit = dynamic_p(rho_FL330, 250.18)
-y = np.arange(0, b2, 0.01)
+CL_crit = 0.514 * 1.5
+y = np.linspace(0, b2, 800)
 
 
 def chord(y):
@@ -134,16 +136,6 @@ def T_distribution(CL, q, wingbox):
     T = quad_vec(dTdx, y, b2)[0]
     return interp1d(y, T, kind='cubic', fill_value='extrapolate')
 
-
-# %%
-'''
-figure, axes = plt.subplots(4)
-axes[0].plot(y, Cl_distribution(0.3)[0](y))
-axes[0].plot(y, Cd_distribution(0.3)(y))
-axes[0].plot(y, Cn_distribution(0.3)(y))
-axes[1].plot(y, F_distribution(0.3, q)(y))
-axes[2].plot(y, V_distribution(0.3, q)(y))
-axes[3].plot(y, M_distribution(V_distribution(0.3, q))(y))
-plt.show()
-'''
-# %%
+#%%
+V = V_distribution(CL_crit, q_crit)
+M = M_distribution(V)
