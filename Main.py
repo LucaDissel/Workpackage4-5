@@ -144,11 +144,11 @@ class Stringer:
 
     def Q_x(self, y):
         """Returns first moment of area about z=0"""
-        return self.A * self.point[1] * chord(y) * (self.length >= y)
+        return self.A(y) * self.point[1] * chord(y) * (self.length >= y)
 
     def Q_z(self, y):
         """Returns first moment of area about x=0"""
-        return self.A * self.point[0] * chord(y) * (self.length >= y)
+        return self.A(y) * self.point[0] * chord(y) * (self.length >= y)
 
     @property
     def I_xc(self):
@@ -156,7 +156,7 @@ class Stringer:
 
     def I_xx(self, y, z_centroid):
         """Returns second moment of area about z_centroid"""
-        return self.I_xc + self.A * (self.point[1] * chord(y) -
+        return self.I_xc + self.A(y) * (self.point[1] * chord(y) -
                                      z_centroid)**2 * (self.length >= y)
 
 
@@ -550,7 +550,10 @@ class WingBox:
             rib1 = rib2
     
     def check_shear_buckling(self):
-        pass
+        rib1 = self.ribs[0]
+        for rib2 in self.ribs[1:]:
+            y1, y2 = rib1, rib2
+            chord1, chord2 = chord(y1), chord(y2)
 
     def plot(self):
         c = chord(0)
