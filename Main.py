@@ -632,3 +632,29 @@ def theta(y, wingbox: WingBox, CL=CL_crit, q=q_crit):
 
 
 # Luca typed this
+class C_stringer(Stringer):
+    
+    def __init__(self, x, length, h, w, t, upper=True):
+        self.height = h * 1e-3
+        self.width = w * 1e-3
+        self.thick = t * 1e-3
+        area = 2*w*t + h*t - 3*t**2
+        super().__init__(area, x, length, upper=upper)
+    
+    @property
+    def zbar(self):
+        Q = self.height * self.thick * (self.height/2) + (self.width-self.thick) * self.thick * (self.height - self.thick/2)
+        A = 2*self.height*self.thick + self.height*self.thick - 3*self.thick**2
+        return Q / A
+
+    @property
+    def I_xc(self):
+        Ibar = (1/12)*(2*(self.width - self.thick) * self.thick**3 + self.height**3 * self.thick) 
+        steiner1 = ((self.width - self.thick)*self.thick)*((self.zbar)**2 + (self.height - self.thick/2 - self.zbar)**2)
+        steiner2 = (self.height*self.thick)*(self.height/2 - self.zbar)**2
+        return Ibar + steiner1 + steiner2
+    
+    @property
+    def I_over_A(self):
+        """Returns inertia over area. Used for column buckling"""
+        return self.I_xc / (2*self.height*self.thick + self.height*self.thick - 3*self.thick**2)
